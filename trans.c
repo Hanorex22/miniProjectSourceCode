@@ -18,6 +18,15 @@ void textFile(FILE *readPtr);
 void updateRecord(FILE *fPtr);
 void newRecord(FILE *fPtr);
 void deleteRecord(FILE *fPtr);
+void saveTransaction(unsigned int acc, double amt);
+void viewTransactions();
+
+struct transactionData
+{
+    unsigned int acctNum;
+    double amount;
+    char type; // 'D' = Deposit, 'W' = Withdrawal
+};
 
 int main(int argc, char *argv[])
 {
@@ -53,6 +62,9 @@ int main(int argc, char *argv[])
             deleteRecord(cfPtr);
             break;
         // display if user does not select valid choice
+        case 6:
+            viewTransactions();
+            break;
         default:
             puts("Incorrect choice");
             break;
@@ -105,6 +117,8 @@ void updateRecord(FILE *fPtr)
     // create clientData with no information
     struct clientData client = {0, "", "", 0.0};
 
+   
+
     // obtain number of account to update
     printf("%s", "Enter account to update ( 1 - 100 ): ");
     scanf("%d", &account);
@@ -125,17 +139,43 @@ void updateRecord(FILE *fPtr)
         // request transaction amount from user
         printf("%s", "Enter charge ( + ) or payment ( - ): ");
         scanf("%lf", &transaction);
-        client.balance += transaction; // update record balance
+        client.balance += transaction;
+        saveTransaction(account, transaction); // update record balance
 
         printf("%-6d%-16s%-11s%10.2f\n", client.acctNum, client.lastName, client.firstName, client.balance);
 
         // move file pointer to correct record in file
         // move back by 1 record length
-        fseek(fPtr, -sizeof(struct clientData), SEEK_CUR);
+        fseek(fPtr, -(long)sizeof(struct clientData), SEEK_CUR);
         // write updated record over old record in file
         fwrite(&client, sizeof(struct clientData), 1, fPtr);
     } // end else
 } // end function updateRecord
+void saveTransaction(unsigned int acc, double amt)
+{
+    FILE *tPtr;
+
+    if ((tPtr = fopen("transactions.txt", "ab")) == NULL)
+    {
+        printf("Transaction file error.\n");
+        return;
+    }
+
+    struct transactionData t;
+
+    t.acctNum = acc;
+    t.amount = amt;
+
+    if (amt >= 0)
+        t.type = 'D';
+    else
+        t.type = 'W';
+
+    fwrite(&t, sizeof(struct transactionData), 1, tPtr);
+
+    fclose(tPtr);
+}
+
 
 // delete an existing record
 void deleteRecord(FILE *fPtr)
@@ -165,6 +205,28 @@ void deleteRecord(FILE *fPtr)
         fwrite(&blankClient, sizeof(struct clientData), 1, fPtr);
     } // end else
 } // end function deleteRecord
+void viewTransactions()
+{
+    FILE *tPtr;
+    struct transactionData t;
+
+    if ((tPtr = fopen("transactions.txt", "rb")) == NULL)
+    {
+        printf("No transaction history found.\n");
+        return;
+    }
+
+    printf("\n%-10s %-10s %-10s\n", "Account", "Amount", "Type");
+
+    while (fread(&t, sizeof(struct transactionData), 1, tPtr))
+    {
+        printf("%-10d %-10.2f %-10c\n",
+               t.acctNum, t.amount,
+               t.type == 'D' ? 'D' : 'W');
+    }
+
+    fclose(tPtr);
+}
 
 // create and insert record
 void newRecord(FILE *fPtr)
@@ -205,14 +267,14 @@ unsigned int enterChoice(void)
 {
     unsigned int menuChoice; // variable to store user's choice
     // display available options
-    printf("%s", "\nEnter your choice\n"
-                 "1 - store a formatted text file of accounts called\n"
-                 "    \"accounts.txt\" for printing\n"
-                 "2 - update an account\n"
-                 "3 - add a new account\n"
-                 "4 - delete an account\n"
-                 "5 - end program\n? ");
-
+    printf("\nEnter your choice\n"
+       "1 - store a formatted text file of accounts called\n"
+       "    \"accounts.txt\" for printing\n"
+       "2 - update an account\n"
+       "3 - add a new account\n"
+       "4 - delete an account\n"
+       "5 - end program\n"
+       "6 - view transaction history\n");
     scanf("%u", &menuChoice); // receive choice from user
     return menuChoice;
 } // end function enterChoice
